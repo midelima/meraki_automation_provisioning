@@ -1,10 +1,16 @@
 
 import meraki
 import sys
+import requests
+import json
+import os
 
 # This uses Meraki Python SDK
 # Make sure the MERAKI_DASHBOARD_API_KEY variable environment is defined
 
+api_key = os.environ.get('MERAKI_DASHBOARD_API_KEY')
+if not api_key:
+            raise APIKeyError()
 dashboard = meraki.DashboardAPI()
 
 # Functions
@@ -13,7 +19,7 @@ def getorgid():
         for org_name in my_orgs:
                 print(org_name['name'])
 
-        org = input("Enter the organization name")
+        org = input("Enter the organization name : ")
 
         for org_name in my_orgs:
                 if org_name['name'] == org:
@@ -21,9 +27,12 @@ def getorgid():
         return('null')
 
 def createnetwork(org_id, site_code):
-        ntw_name = format(str(site_code + "_Branch"))
-        ntw_type = ["wireless", "appliance", "switch", "systemsManager", "camera", "cellularGateway", "environmental"]
-        dashboard.organizations.createOrganizationNetwork(org_id, ntw_name, ntw_type)
+        ntw_name = format(str("Branch_"+ str(site_code)))
+        ntw_type = ['wireless', 'appliance', 'switch', 'systemsManager', 'camera', 'sensor', 'cellularGateway']
+        param = {
+                'tags' : [format(str("n_"+ str(site_code)))]
+        }
+        dashboard.organizations.createOrganizationNetwork(org_id, ntw_name, ntw_type, **param)
         print("Creating the network…")
 
         ntw = dashboard.organizations.getOrganizationNetworks(org_id)
@@ -37,34 +46,52 @@ def createvlans(ntw_id, site_code):
         dashboard.appliance.updateNetworkApplianceVlansSettings(ntw_id, vlansEnabled=True)
 
         #VLAN10
-        subnet = format(str("10." + site_code + ".10.0/24"))
-        applianceip = format(str("10." + site_code + ".10.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "10", "DATA", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".10.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".10.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "10", "DATA", **param)
+
 
         # VLAN20
-        subnet = format(str("10." + site_code + ".20.0/24"))
-        applianceip = format(str("10." + site_code + ".20.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "20", "VOICE", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".20.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".20.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "20", "VOICE", **param)
+        
 
         # VLAN30
-        subnet = format(str("10." + site_code + ".30.0/24"))
-        applianceip = format(str("10." + site_code + ".30.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "30", "WLAN-CORP", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".30.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".30.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "30", "WLAN-CORP", **param)
+
 
         # VLAN40
-        subnet = format(str("10." + site_code + ".40.0/24"))
-        applianceip = format(str("10." + site_code + ".40.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "40", "WLAN-GUEST", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".40.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".40.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "40", "WLAN-GUEST", **param)
+
 
         # VLAN90
-        subnet = format(str("10." + site_code + ".90.0/24"))
-        applianceip = format(str("10." + site_code + ".90.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "90", "MGMT", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".90.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".90.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "90", "MGMT", **param)
+        
 
         # VLAN100
-        subnet = format(str("10." + site_code + ".100.0/24"))
-        applianceip = format(str("10." + site_code + ".100.254"))
-        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "100", "INX_ROUTER", subnet, applianceip)
+        param = {
+                'subnet' : format(str("10." + site_code + ".100.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".100.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "100", "INX_ROUTER", **param)
+
 
         # DELETE VLAN 1
         dashboard.appliance.deleteNetworkApplianceVlan(ntw_id, "1")
@@ -164,7 +191,7 @@ def createfwrules(ntw_id, site_code):
 
 def createstaticroute(ntw_id, site_code):
         gtwip = format(str("10." + str(site_code) + ".100.1"))
-        dashboard.appliance.createNetworkApplianceStaticRoute(ntw_id, "MPLS_ROUTE", "172.16.0.0/12", gtwip)
+        dashboard.appliance.createNetworkApplianceStaticRoute(ntw_id, "INX_ROUTE", "172.16.0.0/12", gtwip)
         return ('success')
 
 # Main
