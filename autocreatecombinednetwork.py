@@ -5,7 +5,7 @@ import requests
 import json
 import os
 
-# This uses Meraki Python SDK
+# This script uses Meraki Python SDK
 # Make sure the MERAKI_DASHBOARD_API_KEY variable environment is defined
 
 api_key = os.environ.get('MERAKI_DASHBOARD_API_KEY')
@@ -26,11 +26,16 @@ def getorgid():
                         return org_name['id']
         return('null')
 
+# In case a clone from an existing network is not needed, make sure to removed the "copyFromNetworkID" field below.
+# If you would like to clone from an existing network, please add the networkid below of the network to be cloned and check that network types are correct.
 def createnetwork(org_id, site_code):
         ntw_name = format(str("Branch_"+ str(site_code)))
         ntw_type = ['wireless', 'appliance', 'switch', 'systemsManager', 'camera', 'sensor', 'cellularGateway']
         param = {
-                'tags' : [format(str("n_"+ str(site_code)))]
+                'tags' : [format(str("n_"+ str(site_code)))],
+                'timezone' : "Europe/Paris",
+                'copyFromNetworkId' : "xxxxx",
+                'notes' : "Combined network demo"
         }
         dashboard.organizations.createOrganizationNetwork(org_id, ntw_name, ntw_type, **param)
         print("Creating the network…")
@@ -194,11 +199,104 @@ def createstaticroute(ntw_id, site_code):
         dashboard.appliance.createNetworkApplianceStaticRoute(ntw_id, "INX_ROUTE", "172.16.0.0/12", gtwip)
         return ('success')
 
+# Uncomment function below if you would like to add devices as part of your demo
+# Also uncomment the function in the main below and adapt your sn
+# def adddevices(ntw_id, sn_ms, sn_mr, sn_mx):
+#         url = "https://api.meraki.com/api/v1/networks/"+format(str(ntw_id))+"/devices/claim"
+#         print(url)
+        
+#         payload = json.dumps({
+#             "serials": [
+#                 sn_mx,
+#                 sn_ms,
+#                 sn_mr
+#             ]
+#         })
+
+#         headers = {
+#           'X-Cisco-Meraki-API-Key': '852f16c2ceb0f3529784e363a414f92f883a2289',
+#           'Content-Type': 'application/json'
+#         }
+
+#         response = requests.request("POST", url, headers=headers, data=payload)
+#         print("Devices added successfully")
+
+#         return ('success')
+
+# Uncomment and adapt function below if you would like to configure switchports as part of your demo
+# Also uncomment the function in the main below and adapt your sn
+# def confswitchport(sn_ms):
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='1',
+#                                  name='AP',
+#                                  tags=['WIFI'],
+#                                  enabled='true',
+#                                  type='trunk',
+#                                  vlan='1',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Open'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='2',
+#                                  name='MV',
+#                                  tags=['Camera'],
+#                                  enabled='true',
+#                                  type='access',
+#                                  vlan='90',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Open'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         print("Port 3 configured successfully")
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='3',
+#                                  name='PC',
+#                                  tags=['PC'],
+#                                  enabled='true',
+#                                  type='access',
+#                                  vlan='10',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Custom access policy',
+#                                  accessPolicyNumber='1'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         print("Port 3 configured successfully")
+
+#         return ('success')
+
 # Main
 def main(argv):
 
         print("This creates a Combined Network and configure the network based on a code site")
         print("Configuration will include VLANs, Static routes, DHCP and Firewall rules")
+        sn_mx = format(str("xxxx-xxxx-xxxx"))
+        sn_ms = format(str("xxxx-xxxx-xxxx"))
+        sn_mr = format(str("xxxx-xxxx-xxxx"))
 
         orgid = getorgid()
         sitecode = input("Enter the site code :")
@@ -206,6 +304,8 @@ def main(argv):
         createvlans(ntwid, sitecode)
         createfwrules(ntwid, sitecode)
         createstaticroute(ntwid, sitecode)
+        #adddevices(ntwid, sn_ms, sn_mr, sn_mx)
+        #confswitchport(sn_ms)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
