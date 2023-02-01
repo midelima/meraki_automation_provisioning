@@ -3,10 +3,9 @@ import meraki
 import sys
 import requests
 import json
-import time
 import os
 
-# This uses Meraki Python SDK
+# This script uses Meraki Python SDK
 # Make sure the MERAKI_DASHBOARD_API_KEY variable environment is defined
 
 api_key = os.environ.get('MERAKI_DASHBOARD_API_KEY')
@@ -27,11 +26,16 @@ def getorgid():
                         return org_name['id']
         return('null')
 
-def createnetwork(org_id, i):
-        ntw_name = format(str("Branch_"+ str(i)))
-        ntw_type = ["wireless", "appliance", "switch", "systemsManager", "camera", "cellularGateway", "environmental"]
+# In case a clone from an existing network is not needed, make sure to removed the "copyFromNetworkID" field below.
+# If you would like to clone from an existing network, please add the networkID below and check that network types are correct.
+def createnetwork(org_id, site_code):
+        ntw_name = format(str("Branch_"+ str(site_code)))
+        ntw_type = ['wireless', 'appliance', 'switch', 'systemsManager', 'camera', 'sensor', 'cellularGateway']
         param = {
-                'tags' : [format(str("n_"+ str(i)))]
+                'tags' : [format(str("n_"+ str(site_code)))],
+                'timezone' : "Europe/Paris",
+                'copyFromNetworkId' : "xxxxxx",
+                'notes' : "Combined network demo"
         }
         dashboard.organizations.createOrganizationNetwork(org_id, ntw_name, ntw_type, **param)
         print("Creating the network…")
@@ -40,109 +44,268 @@ def createnetwork(org_id, i):
         for ntwid in ntw:
                 if ntwid['name'] == ntw_name:
                         return ntwid['id']
-        return('success')
+        return('null')
 
-def changelan(ntw_id, i):
-        print("Changing LAN IP Subnet")
-        if i < 256 :
-                param = {
-                        'subnet' : format(str("10.0."+ str(i)+".0/24")),
-                        'applianceIp' : format(str("10.0."+ str(i)+".254"))
-                }
-        elif i >= 256 and i < 512 :
-                param = {
-                        'subnet' : format(str("10.1."+ str(i-256)+".0/24")),
-                        'applianceIp' : format(str("10.1."+ str(i-256)+".254"))
-                }
-        elif i >= 512 and i < 768 :
-                param = {
-                        'subnet' : format(str("10.2."+ str(i-512)+".0/24")),
-                        'applianceIp' : format(str("10.2."+ str(i-512)+".254"))
-                }
-        elif i >= 768 and i < 1024 :
-                param = {
-                        'subnet' : format(str("10.3."+ str(i-768)+".0/24")),
-                        'applianceIp' : format(str("10.3."+ str(i-768)+".254"))
-                }
-        elif i >= 1024 and i < 1280 :
-                param = {
-                        'subnet' : format(str("10.4."+ str(i-1024)+".0/24")),
-                        'applianceIp' : format(str("10.4."+ str(i-1024)+".254"))
-                }
-        elif i >= 1280 and i < 1536 :
-                param = {
-                        'subnet' : format(str("10.5."+ str(i-1280)+".0/24")),
-                        'applianceIp' : format(str("10.5."+ str(i-1280)+".254"))
-                }
-        dashboard.appliance.updateNetworkApplianceSingleLan(ntw_id,**param)
+def createvlans(ntw_id, site_code):
+        print("Configuring VLANs")
+        dashboard.appliance.updateNetworkApplianceVlansSettings(ntw_id, vlansEnabled=True)
 
-        return ('success')
-
-
-def enablevpn(ntw_id, i):
-        print("Enabling VPN")
-        if i < 256 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.0."+ str(i)+".0/24")), 'useVpn': True}]
-                }
-        elif i >= 256 and i < 512 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.1."+ str(i-256)+".0/24")), 'useVpn': True}]
-                }
-        elif i >= 512 and i < 768 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.2."+ str(i-512)+".0/24")), 'useVpn': True}]
-                }
-        elif i >= 768 and i < 1024 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.3."+ str(i-768)+".0/24")), 'useVpn': True}]
-                }
-        elif i >= 1024 and i < 1280 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.4."+ str(i-1024)+".0/24")), 'useVpn': True}]
-                }
-        elif i >= 1280 and i < 1536 :
-                param = {
-                        'subnets': [{'localSubnet': format(str("10.5."+ str(i-1280)+".0/24")), 'useVpn': True}]
-                }
-        mode = "hub"
-        dashboard.appliance.updateNetworkApplianceVpnSiteToSiteVpn(ntw_id, mode, **param)
-
-        return ('success')
-
-
-def enable3rdpartyvpn(orgid, iteration):
-        print("Configuring NM-VPN")
+        #VLAN10
         param = {
-                'peers': [{'name': format(str("EUR_"+ str(i))), 'publicIp': '45.15.204.101', 'privateSubnets': ['0.0.0.0/0'], 'secret': 'MerakiEurope!', 'ikeVersion': '2', 'networkTags': [format(str("n_"+ str(i)))], 'myUserFqdn': 'homesig78@2502110-512139444-umbrella.com', 'ipsecPoliciesPreset': 'aws'} for i in range(1,iteration+1)]
+                'subnet' : format(str("10." + site_code + ".10.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".10.254"))
         }
-        dashboard.appliance.updateOrganizationApplianceVpnThirdPartyVPNPeers(orgid, **param)
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "10", "DATA", **param)
 
+
+        # VLAN20
+        param = {
+                'subnet' : format(str("10." + site_code + ".20.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".20.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "20", "VOICE", **param)
+        
+
+        # VLAN30
+        param = {
+                'subnet' : format(str("10." + site_code + ".30.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".30.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "30", "WLAN-CORP", **param)
+
+
+        # VLAN40
+        param = {
+                'subnet' : format(str("10." + site_code + ".40.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".40.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "40", "WLAN-GUEST", **param)
+
+
+        # VLAN90
+        param = {
+                'subnet' : format(str("10." + site_code + ".90.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".90.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "90", "MGMT", **param)
+        
+
+        # VLAN100
+        param = {
+                'subnet' : format(str("10." + site_code + ".100.0/24")),
+                'applianceIp' : format(str("10." + site_code + ".100.254"))
+        }
+        dashboard.appliance.createNetworkApplianceVlan(ntw_id, "100", "INX_ROUTER", **param)
+
+
+        # DELETE VLAN 1
+        dashboard.appliance.deleteNetworkApplianceVlan(ntw_id, "1")
 
         return ('success')
 
+def createfwrules(ntw_id, site_code):
+        print("Configuring Firewall Rules")
 
+        dashboard.appliance.updateNetworkApplianceFirewallL3FirewallRules(
+                ntw_id,
+                rules=[
+                                {
+                                        "comment": "Block WIFI_GUEST to LAN",
+                                        "policy": "deny",
+                                        "protocol": "Any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".40.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "10.0.0.0/8,172.16.0.0/12, 192.168.0.0/16",
+                                },
+                                {
+                                        "comment": "Allow WIFI_GUEST to Internet only",
+                                        "policy": "allow",
+                                        "protocol": "tcp",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".40.0/24")),
+                                        "destPort": "53,80,443",
+                                        "destCidr": "Any",
+                                },
+                                {
+                                        "comment": "Allow WIFI_GUEST to Internet only",
+                                        "policy": "allow",
+                                        "protocol": "udp",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".40.0/24")),
+                                        "destPort": "53",
+                                        "destCidr": "Any",
+                                },
+                                {
+                                        "comment": "Allow VOICE to Collab resources",
+                                        "policy": "allow",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".20.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.240.0/24",
+                                },
+                                {
+                                        "comment": "Block VISIO to other DC resources",
+                                        "policy": "deny",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".20.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.0.0/12",
+                                },
+                                {
+                                        "comment": "Allow CORP Users to DC Hosted Business Apps",
+                                        "policy": "allow",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".10.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.230.0/24",
+                                },
+                                {
+                                        "comment": "Block CORP Users to other DC resources",
+                                        "policy": "deny",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".10.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.0.0/12",
+                                },
+                                {
+                                        "comment": "Allow MGMT to access DC monitoring tools",
+                                        "policy": "allow",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".90.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.220.0/24",
+                                },
+                                {
+                                        "comment": "Block MGMT to access other DC resources",
+                                        "policy": "deny",
+                                        "protocol": "any",
+                                        "srcPort": "Any",
+                                        "srcCidr": format(str("10." + str(site_code) + ".90.0/24")),
+                                        "destPort": "Any",
+                                        "destCidr": "172.16.0.0/12",
+                                }
+                        ]
+        )
+        return ('success')
+
+def createstaticroute(ntw_id, site_code):
+        gtwip = format(str("10." + str(site_code) + ".100.1"))
+        dashboard.appliance.createNetworkApplianceStaticRoute(ntw_id, "INX_ROUTE", "172.16.0.0/12", gtwip)
+        return ('success')
+
+# Uncomment function below if you would like to add devices as part of your demo
+# Also uncomment the function in the main below and adapt your sn
+# def adddevices(ntw_id, sn_ms, sn_mr, sn_mx):
+#         url = "https://api.meraki.com/api/v1/networks/"+format(str(ntw_id))+"/devices/claim"
+#         print(url)
+        
+#         payload = json.dumps({
+#             "serials": [
+#                 sn_mx,
+#                 sn_ms,
+#                 sn_mr
+#             ]
+#         })
+
+#         headers = {
+#           'X-Cisco-Meraki-API-Key': '852f16c2ceb0f3529784e363a414f92f883a2289',
+#           'Content-Type': 'application/json'
+#         }
+
+#         response = requests.request("POST", url, headers=headers, data=payload)
+#         print("Devices added successfully")
+
+#         return ('success')
+
+# Uncomment and adapt function below if you would like to configure switchports as part of your demo
+# Also uncomment the function in the main below and adapt your sn
+# def confswitchport(sn_ms):
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='1',
+#                                  name='AP',
+#                                  tags=['WIFI'],
+#                                  enabled='true',
+#                                  type='trunk',
+#                                  vlan='1',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Open'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='2',
+#                                  name='MV',
+#                                  tags=['Camera'],
+#                                  enabled='true',
+#                                  type='access',
+#                                  vlan='90',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Open'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         print("Port 3 configured successfully")
+#         update_switchport = dict(serial=sn_ms,
+#                                  portId='3',
+#                                  name='PC',
+#                                  tags=['PC'],
+#                                  enabled='true',
+#                                  type='access',
+#                                  vlan='10',
+#                                  voiceVlan='20',
+#                                  allowedVlans='1-1000',
+#                                  isolationEnabled='false',
+#                                  rstpEnabled='true',
+#                                  stpGuard='disabled',
+#                                  linkNegotiation='Auto negotiate',
+#                                  portScheduled='null',
+#                                  udld='Alert only',
+#                                  linkNegotiationCapabilities='Auto negotiate',
+#                                  accessPolicyType='Custom access policy',
+#                                  accessPolicyNumber='1'
+#                                 )
+#         dashboard.switch.updateDeviceSwitchPort(**update_switchport)
+#         print("Port 3 configured successfully")
+
+#         return ('success')
 
 # Main
 def main(argv):
 
-        print(dashboard.appliance.getOrganizationApplianceVpnThirdPartyVPNPeers('741405088655870450'))
-        print("This script offers a bulk provisioning for networks and NM-VPN S2S configurations")
+        print("This creates a Combined Network and configure the network based on a code site")
+        print("Configuration will include VLANs, Static routes, DHCP and Firewall rules")
+        sn_mx = format(str("xxxx-xxxx-xxxx"))
+        sn_ms = format(str("xxxx-xxxx-xxxx"))
+        sn_mr = format(str("xxxx-xxxx-xxxx"))
 
         orgid = getorgid()
-        iteration = int(input("Enter the number of networks and NM-VPN S2S to be created : "))
-        for i in range(1003,iteration+1) :
-               print("i= " + str(i))
-               print("iteration= "+ str(iteration))
-               ntwid = createnetwork(orgid, i)
-               print(ntwid)
-               #ntwtag getnetworktag(ntwid)
-               time.sleep(2)
-               changelan(ntwid, i)
-               enablevpn(ntwid, i)
-               time.sleep(1)
-        enable3rdpartyvpn(orgid, iteration)
-        return ('success')
+        sitecode = input("Enter the site code :")
+        ntwid = createnetwork(orgid, sitecode)
+        createvlans(ntwid, sitecode)
+        createfwrules(ntwid, sitecode)
+        createstaticroute(ntwid, sitecode)
+        #adddevices(ntwid, sn_ms, sn_mr, sn_mx)
+        #confswitchport(sn_ms)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
