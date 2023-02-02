@@ -34,7 +34,7 @@ def createnetwork(org_id, site_code):
         param = {
                 'tags' : [format(str("n_"+ str(site_code)))],
                 'timezone' : "Europe/Paris",
-                'copyFromNetworkId' : "xxxxx",
+                #'copyFromNetworkId' : "xxxxx",
                 'notes' : "Combined network demo"
         }
         dashboard.organizations.createOrganizationNetwork(org_id, ntw_name, ntw_type, **param)
